@@ -26,8 +26,7 @@ class ImageDataset(Dataset):
     def __init__(self, type_path=None, transform=None):
         """
         Args:
-            csv_file (string): Path to the csv file with annotations.
-            root_dir (string): Directory with all the images.
+            type_path: If either the train or test set
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
@@ -89,26 +88,23 @@ def train_model(transform, batch_size, epochs):
     train_data = ImageDataset(type_path="train", transform=transform)
     trainloader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,
                                             shuffle=True)
-    print("Done loading in training data.")
+    print("Done loading in training data.\n")
 
-    # Iterating through everything
-    dataiter = iter(trainloader)
-    features, labels = next(dataiter)
-    print("Looking at one batch!")
-    print(labels)
-    print("\n")
-
-    # Creating the CNN
+    # Creating the CNN, loss function, and optimizer
     net = Net()
-
-    # Loss Function and Optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
+    # Train for number of epochs
     print("Start Training!\n")
-    for epoch in range(epochs):  # loop over the dataset multiple times
-        print("Epoch " + str(epoch) + "\n")
+    for epoch in range(epochs):
+
+        # Reset the loss and correct
+        print("Epoch " + str(epoch))
         running_loss = 0.0
+        correct = 0
+
+        # Iterate through each batch
         for i, data in enumerate(trainloader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
@@ -122,12 +118,21 @@ def train_model(transform, batch_size, epochs):
             loss.backward()
             optimizer.step()
 
+            # Calculate accuracy
+            _, predicted = torch.max(outputs.data, 1)
+            correct += (predicted == labels).float().sum()
+
             # print statistics
             running_loss += loss.item()
-            print(running_loss)
-    print("Finished Training!\n")
+        
+        # Calculation of the accuracy and loss
+        total_loss = running_loss / len(train_data)
+        accuracy = 100 * correct / len(train_data)
+        print("Loss = {}".format(total_loss))
+        print("Accuracy = {}\n".format(accuracy))
 
     # Saving trained model
+    print("Finished Training!\n")
     PATH = 'weights/initial_training.pth'
     torch.save(net.state_dict(), PATH)
 
