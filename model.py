@@ -80,6 +80,48 @@ class Net(nn.Module):
         logits = self.linear_relu_stack(x)
         return logits
 
+'''
+Training the model!
+'''
+def train_model():
+    return
+
+'''
+Testing the model!
+'''
+def test_model(transform, weights_path, batch_size):
+    # Loading in initial test data
+    print("\nLoading in test data...")
+    test_data = ImageDataset(type_path="test", transform=transform)
+    testloader = torch.utils.data.DataLoader(test_data, batch_size=batch_size,
+                                            shuffle=True)
+    print("Done loading in test data.")
+
+    # Test Loading
+    dataiter = iter(testloader)
+    images, labels = next(dataiter)
+
+    # Loading in a new example of the neural net, and loading in the weights
+    net = Net()
+    net.load_state_dict(torch.load(weights_path))
+
+    # Getting accuracy of the data
+    correct = 0
+    total = 0
+    # since we're not training, we don't need to calculate the gradients for our outputs
+    with torch.no_grad():
+        for data in testloader:
+            images, labels = data
+            # calculate outputs by running images through the network
+            outputs = net(images)
+            # the class with the highest energy is what we choose as prediction
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+    
+    # Print out accuracy!
+    print('Accuracy of the network on the ' + str(len(test_data)) + ' test images: ' + str(100 * correct // total) + '%')
+
 def main():
     # Transform and batch size
     transform = transforms.Compose(
@@ -89,18 +131,11 @@ def main():
     batch_size = 200
 
     # Loading in initial training data
-    print("Loading in training data...")
+    '''print("Loading in training data...")
     train_data = ImageDataset(type_path="train", transform=transform)
     trainloader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,
                                             shuffle=True)
     print("Done loading in training data.")
-
-    # Loading in initial test data
-    '''print("\nLoading in test data...")
-    test_data = ImageDataset(type_path="test", transform=transform)
-    testloader = torch.utils.data.DataLoader(test_data, batch_size=batch_size,
-                                            shuffle=True)
-    print("Done loading in test data.")'''
 
     # Iterating through everything
     dataiter = iter(trainloader)
@@ -136,14 +171,15 @@ def main():
             # print statistics
             running_loss += loss.item()
             print(running_loss)
-            #if i % 500 == 499:    # print every 2000 mini-batches
-            #    print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 500:.3f}')
-            #    running_loss = 0.0
-    print('Finished Training')
+    print("Finished Training!\n")
 
     # Saving trained model
     PATH = 'weights/initial_training.pth'
-    torch.save(net.state_dict(), PATH)
+    torch.save(net.state_dict(), PATH)'''
 
-    
+    # Testing the model
+    PATH = 'weights/initial_training.pth'
+    test_model(transform, PATH, batch_size)
+
+
 main()
