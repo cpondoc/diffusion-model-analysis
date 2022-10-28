@@ -10,10 +10,17 @@ In developing our classifier, we will run numerous particular experiments, espec
 
 ## Sources:
 [1] https://openai.com/dall-e-2/
+
 [2] https://arxiv.org/abs/2112.10752
+
 [3] https://www.linkedin.com/pulse/blitzscaling-creativity-dall-e-reid-hoffman/
+
 [4] https://techcrunch.com/2022/08/24/deepfakes-for-all-uncensored-ai-art-model-prompts-ethics-questions/
+
 [5] https://artofericwayne.com/2022/05/31/will-ai-replace-human-artists/
+
 [6] https://machinelearningmastery.com/transfer-learning-for-deep-learning/
+
 [7] https://arxiv.org/abs/1406.2661
+
 [8] https://www.image-net.org/

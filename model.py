@@ -81,6 +81,12 @@ class Net(nn.Module):
 '''
 Create plots for training and test accuracies for several epochs.
 '''
+def plot_metrics(metric_set, metric_name, save_path):
+    fig, ax = plt.subplots()
+    ax.plot(metric_set)
+    ax.set(xlabel='epochs', ylabel=metric_name,
+        title='Training ' + metric_name)
+    fig.savefig('graphs/' + save_path)
 
 '''
 Training the model!
@@ -105,29 +111,27 @@ def train_model(transform, batch_size, epochs):
     for epoch in range(epochs):
 
         # Reset the loss and correct
-        print("Epoch " + str(epoch))
+        print("Epoch " + str(epoch + 1))
         running_loss = 0.0
         correct = 0
 
         # Iterate through each batch
         for i, data in enumerate(trainloader, 0):
-            # get the inputs; data is a list of [inputs, labels]
+            # Get batch data and zero parameter gradients
             inputs, labels = data
-
-            # zero the parameter gradients
             optimizer.zero_grad()
 
-            # forward + backward + optimize
+            # Forward + Backward Propopagation
             outputs = net(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
+
+            # Optimization Step
             optimizer.step()
 
-            # Calculate accuracy
+            # Calculate accuracy and loss
             _, predicted = torch.max(outputs.data, 1)
             correct += (predicted == labels).float().sum()
-
-            # print statistics
             running_loss += outputs.shape[0] * loss.item()
         
         # Calculation of the accuracy and loss
@@ -145,7 +149,9 @@ def train_model(transform, batch_size, epochs):
     PATH = 'weights/initial_training.pth'
     torch.save(net.state_dict(), PATH)
 
-    # Graph it out
+    # Graph out training loss and accuracy over time
+    plot_metrics(training_losses, 'Loss', 'training_loss.png')
+    plot_metrics(training_accuracies, 'Accuracy', 'training_accuracies.png')
 
 '''
 Testing the model!
