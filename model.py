@@ -10,12 +10,11 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import os
 
 from skimage import io, transform
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from torchvision import utils
 
 '''
@@ -80,6 +79,10 @@ class Net(nn.Module):
         return logits
 
 '''
+Create plots for training and test accuracies for several epochs.
+'''
+
+'''
 Training the model!
 '''
 def train_model(transform, batch_size, epochs):
@@ -97,6 +100,8 @@ def train_model(transform, batch_size, epochs):
 
     # Train for number of epochs
     print("Start Training!\n")
+    training_losses = []
+    training_accuracies = []
     for epoch in range(epochs):
 
         # Reset the loss and correct
@@ -123,7 +128,7 @@ def train_model(transform, batch_size, epochs):
             correct += (predicted == labels).float().sum()
 
             # print statistics
-            running_loss += loss.item()
+            running_loss += outputs.shape[0] * loss.item()
         
         # Calculation of the accuracy and loss
         total_loss = running_loss / len(train_data)
@@ -131,10 +136,16 @@ def train_model(transform, batch_size, epochs):
         print("Loss = {}".format(total_loss))
         print("Accuracy = {}\n".format(accuracy))
 
+        # Appending to the arrays to look at further visualization
+        training_losses.append(total_loss)
+        training_accuracies.append(accuracy)
+
     # Saving trained model
     print("Finished Training!\n")
     PATH = 'weights/initial_training.pth'
     torch.save(net.state_dict(), PATH)
+
+    # Graph it out
 
 '''
 Testing the model!
