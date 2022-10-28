@@ -83,8 +83,53 @@ class Net(nn.Module):
 '''
 Training the model!
 '''
-def train_model():
-    return
+def train_model(transform, batch_size, epochs):
+    # Loading in initial training data
+    print("Loading in training data...")
+    train_data = ImageDataset(type_path="train", transform=transform)
+    trainloader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,
+                                            shuffle=True)
+    print("Done loading in training data.")
+
+    # Iterating through everything
+    dataiter = iter(trainloader)
+    features, labels = next(dataiter)
+    print("Looking at one batch!")
+    print(labels)
+    print("\n")
+
+    # Creating the CNN
+    net = Net()
+
+    # Loss Function and Optimizer
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+
+    print("Start Training!\n")
+    for epoch in range(epochs):  # loop over the dataset multiple times
+        print("Epoch " + str(epoch) + "\n")
+        running_loss = 0.0
+        for i, data in enumerate(trainloader, 0):
+            # get the inputs; data is a list of [inputs, labels]
+            inputs, labels = data
+
+            # zero the parameter gradients
+            optimizer.zero_grad()
+
+            # forward + backward + optimize
+            outputs = net(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            # print statistics
+            running_loss += loss.item()
+            print(running_loss)
+    print("Finished Training!\n")
+
+    # Saving trained model
+    PATH = 'weights/initial_training.pth'
+    torch.save(net.state_dict(), PATH)
 
 '''
 Testing the model!
@@ -122,6 +167,9 @@ def test_model(transform, weights_path, batch_size):
     # Print out accuracy!
     print('Accuracy of the network on the ' + str(len(test_data)) + ' test images: ' + str(100 * correct // total) + '%')
 
+'''
+Main hub of setting the hyperparameters, and then calling training and testing for the model.
+'''
 def main():
     # Transform and batch size
     transform = transforms.Compose(
@@ -130,56 +178,12 @@ def main():
         transforms.CenterCrop(250)])
     batch_size = 200
 
-    # Loading in initial training data
-    '''print("Loading in training data...")
-    train_data = ImageDataset(type_path="train", transform=transform)
-    trainloader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,
-                                            shuffle=True)
-    print("Done loading in training data.")
-
-    # Iterating through everything
-    dataiter = iter(trainloader)
-    features, labels = next(dataiter)
-    print("Looking at one batch!")
-    print(labels)
-    print("\n")
-
-    # Creating the CNN
-    net = Net()
-
-    # Loss Function and Optimizer
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-
-    print("Start Training!\n")
-    for epoch in range(2):  # loop over the dataset multiple times
-        print("Epoch " + str(epoch) + "\n")
-        running_loss = 0.0
-        for i, data in enumerate(trainloader, 0):
-            # get the inputs; data is a list of [inputs, labels]
-            inputs, labels = data
-
-            # zero the parameter gradients
-            optimizer.zero_grad()
-
-            # forward + backward + optimize
-            outputs = net(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-
-            # print statistics
-            running_loss += loss.item()
-            print(running_loss)
-    print("Finished Training!\n")
-
-    # Saving trained model
-    PATH = 'weights/initial_training.pth'
-    torch.save(net.state_dict(), PATH)'''
+    # Training the model
+    train_model(transform=transform, batch_size=batch_size, epochs=5)
 
     # Testing the model
     PATH = 'weights/initial_training.pth'
     test_model(transform, PATH, batch_size)
 
-
-main()
+if __name__ == '__main__':
+    main()
