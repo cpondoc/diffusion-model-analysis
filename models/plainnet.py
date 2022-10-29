@@ -7,7 +7,7 @@ import torch.nn as nn
 # Class Definition
 class PlainNet(nn.Module):
     def __init__(self):
-        super(Net, self).__init__()
+        super(PlainNet, self).__init__()
         self.flatten = nn.Flatten()
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(250*250, 512),

@@ -17,6 +17,7 @@ import torchvision.transforms as transforms
 # Import Models
 from models.convbasic import ConvNeuralNet
 from models.plainnet import PlainNet
+from models.transferlearning import load_pretrained_model
 
 '''
 Creating a Custom Image Dataset
@@ -46,14 +47,14 @@ class ImageDataset(Dataset):
 
         # Load in all the non-DALLE images
         non_dalle_imgs = (os.listdir('data/' + type_path + '/non-dalle'))
-        for image in non_dalle_imgs:
-            img_name = 'data/' + type_path + '/non-dalle/' + image
-            torch_img = Image.open(img_name)
-            #torch_img = io.imread(img_name)
-            if (self.transform):
-                torch_img = self.transform(torch_img)
-            sample = {'image': torch_img, 'label': 0}
-            self.all_data.append(sample)
+        while (len(self.all_data) < 2 * len(dalle_imgs)):
+            for image in non_dalle_imgs:
+                img_name = 'data/' + type_path + '/non-dalle/' + image
+                torch_img = Image.open(img_name)
+                if (self.transform):
+                    torch_img = self.transform(torch_img)
+                sample = {'image': torch_img, 'label': 0}
+                self.all_data.append(sample)
 
     def __len__(self):
         return len(self.all_data)
@@ -77,7 +78,7 @@ Training the model!
 def train_model(transform, batch_size, epochs, weights_path, model_type, network):
     # Loading in initial training data
     print("Loading in training data...")
-    train_data = ImageDataset(type_path="test", transform=transform)
+    train_data = ImageDataset(type_path="train", transform=transform)
     trainloader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,
                                             shuffle=True)
     print("Done loading in training data.\n")
@@ -133,7 +134,7 @@ def train_model(transform, batch_size, epochs, weights_path, model_type, network
 
     # Graph out training loss and accuracy over time
     plot_metrics(training_losses, 'Loss', model_type + '_training_loss.png')
-    plot_metrics(training_accuracies, 'Accuracy', model_type + 'cnn_training_accuracies.png')
+    plot_metrics(training_accuracies, 'Accuracy', model_type + '_training_accuracies.png')
 
 '''
 Testing the model!
@@ -185,13 +186,19 @@ def main(model_type):
         [ transforms.Grayscale(num_output_channels=3),
         transforms.CenterCrop(250),
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
+        'TransferLearning': transforms.Compose([
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
     }
 
     # Map of all possible models
     models = {
         'PlainNet': PlainNet(),
-        'ConvBasic': ConvNeuralNet()
+        'ConvBasic': ConvNeuralNet(),
+        'TransferLearning': load_pretrained_model()
     }
 
     # Batch size
@@ -199,11 +206,13 @@ def main(model_type):
 
     # Training and testing the model
     PATH = 'weights/' + model_type + '.pth'
-    train_model(transform=data_transforms['ConvBasic'], batch_size=batch_size, epochs=5, weights_path=PATH, model_type=model_type, network=models[model_type])
-    test_model(data_transforms['ConvBasic'], PATH, batch_size, network=models[model_type])
+    train_model(transform=data_transforms[model_type], batch_size=batch_size, epochs=10, weights_path=PATH, model_type=model_type, network=models[model_type])
+    test_model(data_transforms[model_type], PATH, batch_size, network=models[model_type])
 
 '''
 Run main and then perform everything
 '''
 if __name__ == '__main__':
-    main(model_type="ConvBasic")
+    models = ["PlainNet", "ConvBasic", "TransferLearning"]
+    for model in models:
+        main(model_type=model)
