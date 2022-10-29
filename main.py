@@ -180,7 +180,7 @@ def main(model_type):
     data_transforms = {
         'PlainNet': transforms.Compose(
         [transforms.ToTensor(),
-        transforms.Grayscale(num_output_channels=1),
+        transforms.Grayscale(num_output_channels=3),
         transforms.CenterCrop(250)]),
         'ConvBasic': transforms.Compose(
         [ transforms.Grayscale(num_output_channels=3),
@@ -188,7 +188,8 @@ def main(model_type):
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
         'TransferLearning': transforms.Compose([
-        transforms.RandomResizedCrop(224),
+        transforms.Grayscale(num_output_channels=3),
+        transforms.RandomResizedCrop(250),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
@@ -206,13 +207,14 @@ def main(model_type):
 
     # Training and testing the model
     PATH = 'weights/' + model_type + '.pth'
-    train_model(transform=data_transforms[model_type], batch_size=batch_size, epochs=10, weights_path=PATH, model_type=model_type, network=models[model_type])
+    train_model(transform=data_transforms[model_type], batch_size=batch_size, epochs=3, weights_path=PATH, model_type=model_type, network=models[model_type])
     test_model(data_transforms[model_type], PATH, batch_size, network=models[model_type])
 
 '''
 Run main and then perform everything
 '''
 if __name__ == '__main__':
-    models = ["PlainNet", "ConvBasic", "TransferLearning"]
-    for model in models:
-        main(model_type=model)
+    main(model_type="TransferLearning")
+    #models = ["PlainNet", "ConvBasic", "TransferLearning"]
+    #for model in models:
+    #    main(model_type=model)
