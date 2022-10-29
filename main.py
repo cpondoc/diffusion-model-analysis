@@ -5,20 +5,16 @@ Initial training of the data
 # First, import the necessary libraries
 from __future__ import print_function, division
 import matplotlib.pyplot as plt
-import numpy as np
+import os
+from PIL import Image
 import torch
-import torchvision
-import torchvision.transforms as transforms
-import torch.nn.functional as F
 import torch.nn as nn
 import torch.optim as optim
-import os
-
 from torch.utils.data import Dataset
 from torchvision import utils
+import torchvision.transforms as transforms
 
-from PIL import Image
-
+# Import Models
 from models.convbasic import ConvNeuralNet
 from models.plainnet import PlainNet
 
@@ -78,7 +74,7 @@ def plot_metrics(metric_set, metric_name, save_path):
 '''
 Training the model!
 '''
-def train_model(transform, batch_size, epochs, weights_path):
+def train_model(transform, batch_size, epochs, weights_path, model_type, network):
     # Loading in initial training data
     print("Loading in training data...")
     train_data = ImageDataset(type_path="test", transform=transform)
@@ -87,7 +83,7 @@ def train_model(transform, batch_size, epochs, weights_path):
     print("Done loading in training data.\n")
 
     # Creating the CNN, loss function, and optimizer
-    net = ConvNeuralNet()
+    net = network
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
@@ -136,13 +132,13 @@ def train_model(transform, batch_size, epochs, weights_path):
     torch.save(net.state_dict(), weights_path)
 
     # Graph out training loss and accuracy over time
-    plot_metrics(training_losses, 'Loss', 'cnn_training_loss.png')
-    plot_metrics(training_accuracies, 'Accuracy', 'cnn_training_accuracies.png')
+    plot_metrics(training_losses, 'Loss', model_type + '_training_loss.png')
+    plot_metrics(training_accuracies, 'Accuracy', model_type + 'cnn_training_accuracies.png')
 
 '''
 Testing the model!
 '''
-def test_model(transform, weights_path, batch_size):
+def test_model(transform, weights_path, batch_size, network):
     # Loading in initial test data
     print("\nLoading in test data...")
     test_data = ImageDataset(type_path="test", transform=transform)
@@ -155,7 +151,7 @@ def test_model(transform, weights_path, batch_size):
     images, labels = next(dataiter)
 
     # Loading in a new example of the neural net, and loading in the weights
-    net = ConvNeuralNet()
+    net = network
     net.load_state_dict(torch.load(weights_path))
 
     # Getting accuracy of the data
@@ -178,23 +174,36 @@ def test_model(transform, weights_path, batch_size):
 '''
 Main hub of setting the hyperparameters, and then calling training and testing for the model.
 '''
-def main():
-    # Transform and batch size
-    '''transform = transforms.Compose(
+def main(model_type):
+    # Map of all possible transforms
+    data_transforms = {
+        'PlainNet': transforms.Compose(
         [transforms.ToTensor(),
         transforms.Grayscale(num_output_channels=1),
-        transforms.CenterCrop(250)])'''
-    transform = transforms.Compose(
-    [ transforms.Grayscale(num_output_channels=3),
+        transforms.CenterCrop(250)]),
+        'ConvBasic': transforms.Compose(
+        [ transforms.Grayscale(num_output_channels=3),
         transforms.CenterCrop(250),
         transforms.ToTensor(),
-     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    }
+
+    # Map of all possible models
+    models = {
+        'PlainNet': PlainNet(),
+        'ConvBasic': ConvNeuralNet()
+    }
+
+    # Batch size
     batch_size = 200
 
     # Training and testing the model
-    PATH = 'weights/cnn_training.pth'
-    train_model(transform=transform, batch_size=batch_size, epochs=5, weights_path=PATH)
-    test_model(transform, PATH, batch_size)
+    PATH = 'weights/' + model_type + '.pth'
+    train_model(transform=data_transforms['ConvBasic'], batch_size=batch_size, epochs=5, weights_path=PATH, model_type=model_type, network=models[model_type])
+    test_model(data_transforms['ConvBasic'], PATH, batch_size, network=models[model_type])
 
+'''
+Run main and then perform everything
+'''
 if __name__ == '__main__':
-    main()
+    main(model_type="ConvBasic")
