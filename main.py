@@ -183,14 +183,13 @@ def main(model_type):
         transforms.Grayscale(num_output_channels=3),
         transforms.CenterCrop(250)]),
         'ConvBasic': transforms.Compose(
-        [ transforms.Grayscale(num_output_channels=3),
+        [transforms.Grayscale(num_output_channels=3),
         transforms.CenterCrop(250),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
         'TransferLearning': transforms.Compose([
         transforms.Grayscale(num_output_channels=3),
-        transforms.RandomResizedCrop(250),
-        transforms.RandomHorizontalFlip(),
+        transforms.CenterCrop(250),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
     }
@@ -214,7 +213,6 @@ def main(model_type):
 Run main and then perform everything
 '''
 if __name__ == '__main__':
-    main(model_type="TransferLearning")
-    #models = ["PlainNet", "ConvBasic", "TransferLearning"]
-    #for model in models:
-    #    main(model_type=model)
+    models = ["PlainNet", "ConvBasic", "TransferLearning"]
+    for model in models:
+        main(model_type=model)
