@@ -9,13 +9,18 @@ import numpy as np
 import torch
 import torchvision
 import torchvision.transforms as transforms
+import torch.nn.functional as F
 import torch.nn as nn
 import torch.optim as optim
 import os
 
-from skimage import io, transform
 from torch.utils.data import Dataset
 from torchvision import utils
+
+from PIL import Image
+
+from models.convbasic import ConvNeuralNet
+from models.plainnet import PlainNet
 
 '''
 Creating a Custom Image Dataset
@@ -36,7 +41,8 @@ class ImageDataset(Dataset):
         dalle_imgs = (os.listdir('data/' + type_path + '/dalle'))
         for image in dalle_imgs:
             img_name = 'data/' + type_path + '/dalle/' + image
-            torch_img = io.imread(img_name)
+            torch_img = Image.open(img_name)
+            #torch_img = io.imread(img_name)
             if (self.transform):
                 torch_img = self.transform(torch_img)
             sample = {'image': torch_img, 'label': 1}
@@ -46,7 +52,8 @@ class ImageDataset(Dataset):
         non_dalle_imgs = (os.listdir('data/' + type_path + '/non-dalle'))
         for image in non_dalle_imgs:
             img_name = 'data/' + type_path + '/non-dalle/' + image
-            torch_img = io.imread(img_name)
+            torch_img = Image.open(img_name)
+            #torch_img = io.imread(img_name)
             if (self.transform):
                 torch_img = self.transform(torch_img)
             sample = {'image': torch_img, 'label': 0}
@@ -57,26 +64,6 @@ class ImageDataset(Dataset):
 
     def __getitem__(self, id):
         return (self.all_data[id]["image"], self.all_data[id]["label"])
-
-'''
-Creating a Neural Network
-'''
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-        self.flatten = nn.Flatten()
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(250*250, 512),
-            nn.ReLU(),
-            nn.Linear(512, 512),
-            nn.ReLU(),
-            nn.Linear(512, 10),
-        )
-
-    def forward(self, x):
-        x = self.flatten(x)
-        logits = self.linear_relu_stack(x)
-        return logits
 
 '''
 Create plots for training and test accuracies for several epochs.
@@ -91,16 +78,16 @@ def plot_metrics(metric_set, metric_name, save_path):
 '''
 Training the model!
 '''
-def train_model(transform, batch_size, epochs):
+def train_model(transform, batch_size, epochs, weights_path):
     # Loading in initial training data
     print("Loading in training data...")
-    train_data = ImageDataset(type_path="train", transform=transform)
+    train_data = ImageDataset(type_path="test", transform=transform)
     trainloader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,
                                             shuffle=True)
     print("Done loading in training data.\n")
 
     # Creating the CNN, loss function, and optimizer
-    net = Net()
+    net = ConvNeuralNet()
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
@@ -146,12 +133,11 @@ def train_model(transform, batch_size, epochs):
 
     # Saving trained model
     print("Finished Training!\n")
-    PATH = 'weights/initial_training.pth'
-    torch.save(net.state_dict(), PATH)
+    torch.save(net.state_dict(), weights_path)
 
     # Graph out training loss and accuracy over time
-    plot_metrics(training_losses, 'Loss', 'training_loss.png')
-    plot_metrics(training_accuracies, 'Accuracy', 'training_accuracies.png')
+    plot_metrics(training_losses, 'Loss', 'cnn_training_loss.png')
+    plot_metrics(training_accuracies, 'Accuracy', 'cnn_training_accuracies.png')
 
 '''
 Testing the model!
@@ -169,7 +155,7 @@ def test_model(transform, weights_path, batch_size):
     images, labels = next(dataiter)
 
     # Loading in a new example of the neural net, and loading in the weights
-    net = Net()
+    net = ConvNeuralNet()
     net.load_state_dict(torch.load(weights_path))
 
     # Getting accuracy of the data
@@ -194,17 +180,20 @@ Main hub of setting the hyperparameters, and then calling training and testing f
 '''
 def main():
     # Transform and batch size
-    transform = transforms.Compose(
+    '''transform = transforms.Compose(
         [transforms.ToTensor(),
         transforms.Grayscale(num_output_channels=1),
-        transforms.CenterCrop(250)])
+        transforms.CenterCrop(250)])'''
+    transform = transforms.Compose(
+    [ transforms.Grayscale(num_output_channels=3),
+        transforms.CenterCrop(250),
+        transforms.ToTensor(),
+     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     batch_size = 200
 
-    # Training the model
-    train_model(transform=transform, batch_size=batch_size, epochs=5)
-
-    # Testing the model
-    PATH = 'weights/initial_training.pth'
+    # Training and testing the model
+    PATH = 'weights/cnn_training.pth'
+    train_model(transform=transform, batch_size=batch_size, epochs=5, weights_path=PATH)
     test_model(transform, PATH, batch_size)
 
 if __name__ == '__main__':
