@@ -4,6 +4,7 @@ Initial training of the data
 
 # First, import the necessary libraries
 from __future__ import print_function, division
+import gc
 import matplotlib.pyplot as plt
 import os
 from PIL import Image
@@ -32,35 +33,31 @@ class ImageDataset(Dataset):
                 on a sample.
         """
         self.transform = transform
-        self.all_data = []
+        self.type_path = type_path
+        self.dalle_length = len(os.listdir('data/' + type_path + '/dalle'))
 
-        # Load in all the DALLE images
-        dalle_imgs = (os.listdir('data/' + type_path + '/dalle'))
-        for image in dalle_imgs:
-            img_name = 'data/' + type_path + '/dalle/' + image
+    def __len__(self):
+        return self.dalle_length * 2
+
+    def __getitem__(self, id):
+        if (id < self.dalle_length):
+            dalle_imgs = (os.listdir('data/' + self.type_path + '/dalle'))
+            image = dalle_imgs[id]
+            img_name = 'data/' + self.type_path + '/dalle/' + image
             torch_img = Image.open(img_name)
-            #torch_img = io.imread(img_name)
             if (self.transform):
                 torch_img = self.transform(torch_img)
             sample = {'image': torch_img, 'label': 1}
-            self.all_data.append(sample)
-
-        # Load in all the non-DALLE images
-        non_dalle_imgs = (os.listdir('data/' + type_path + '/non-dalle'))
-        while (len(self.all_data) < 2 * len(dalle_imgs)):
-            for image in non_dalle_imgs:
-                img_name = 'data/' + type_path + '/non-dalle/' + image
-                torch_img = Image.open(img_name)
-                if (self.transform):
-                    torch_img = self.transform(torch_img)
-                sample = {'image': torch_img, 'label': 0}
-                self.all_data.append(sample)
-
-    def __len__(self):
-        return len(self.all_data)
-
-    def __getitem__(self, id):
-        return (self.all_data[id]["image"], self.all_data[id]["label"])
+            return (sample['image'], sample['label'])
+        else:
+            non_dalle_imgs = (os.listdir('data/' + self.type_path + '/non-dalle'))
+            image = non_dalle_imgs[id - self.dalle_length]
+            img_name = 'data/' + self.type_path + '/non-dalle/' + image
+            torch_img = Image.open(img_name)
+            if (self.transform):
+                torch_img = self.transform(torch_img)
+            sample = {'image': torch_img, 'label': 0}
+            return (sample['image'], sample['label'])
 
 '''
 Create plots for training and test accuracies for several epochs.
@@ -85,6 +82,8 @@ def train_model(transform, batch_size, epochs, weights_path, model_type, network
 
     # Creating the CNN, loss function, and optimizer
     net = network
+    if (torch.cuda.is_available()):
+        net.to('cuda')
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
@@ -103,20 +102,22 @@ def train_model(transform, batch_size, epochs, weights_path, model_type, network
         for i, data in enumerate(trainloader, 0):
             # Get batch data and zero parameter gradients
             inputs, labels = data
+            inputs_cuda, labels_cuda = inputs.cuda(), labels.cuda()
             optimizer.zero_grad()
 
             # Forward + Backward Propopagation
-            outputs = net(inputs)
-            loss = criterion(outputs, labels)
+            outputs = net(inputs_cuda)
+            loss = criterion(outputs, labels_cuda)
             loss.backward()
 
             # Optimization Step
             optimizer.step()
 
             # Calculate accuracy and loss
-            _, predicted = torch.max(outputs.data, 1)
+            _, predicted = torch.max(outputs.cpu().data, 1)
             correct += (predicted == labels).float().sum()
-            running_loss += outputs.shape[0] * loss.item()
+            #_, predicted = torch.max(outputs.cpu().data, 1)
+            running_loss += outputs.cpu().shape[0] * loss.item()
         
         # Calculation of the accuracy and loss
         total_loss = running_loss / len(train_data)
@@ -153,6 +154,8 @@ def test_model(transform, weights_path, batch_size, network):
 
     # Loading in a new example of the neural net, and loading in the weights
     net = network
+    if (torch.cuda.is_available()):
+        net.to('cuda')
     net.load_state_dict(torch.load(weights_path))
 
     # Getting accuracy of the data
@@ -162,10 +165,11 @@ def test_model(transform, weights_path, batch_size, network):
     with torch.no_grad():
         for data in testloader:
             images, labels = data
+            images_cuda, labels_cuda = images.cuda(), labels.cuda()
             # calculate outputs by running images through the network
-            outputs = net(images)
+            outputs = net(images_cuda)
             # the class with the highest energy is what we choose as prediction
-            _, predicted = torch.max(outputs.data, 1)
+            _, predicted = torch.max(outputs.cpu().data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
     
@@ -185,7 +189,7 @@ def main(model_type):
         'ConvBasic': transforms.Compose(
         [transforms.Grayscale(num_output_channels=3),
         transforms.CenterCrop(250),
-        transforms.ToTensor(),
+         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
         'TransferLearning': transforms.Compose([
         transforms.Grayscale(num_output_channels=3),
@@ -200,19 +204,20 @@ def main(model_type):
         'ConvBasic': ConvNeuralNet(),
         'TransferLearning': load_pretrained_model()
     }
-
+    model = models[model_type]
+  
     # Batch size
     batch_size = 200
 
     # Training and testing the model
     PATH = 'weights/' + model_type + '.pth'
-    train_model(transform=data_transforms[model_type], batch_size=batch_size, epochs=3, weights_path=PATH, model_type=model_type, network=models[model_type])
-    test_model(data_transforms[model_type], PATH, batch_size, network=models[model_type])
+    train_model(transform=data_transforms[model_type], batch_size=batch_size, epochs=5, weights_path=PATH, model_type=model_type, network=model)
+    test_model(data_transforms[model_type], PATH, batch_size, network=model)
 
 '''
 Run main and then perform everything
 '''
 if __name__ == '__main__':
-    models = ["PlainNet", "ConvBasic", "TransferLearning"]
+    models = ["ConvBasic", "TransferLearning"]
     for model in models:
         main(model_type=model)
