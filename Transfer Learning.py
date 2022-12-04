@@ -1,6 +1,10 @@
-'''
-Initial training of the data
-'''
+# ## CS 229 Final Project - Transfer Learning
+# Notebook to set up all things transfer learning.
+#
+# By: Christopher Pondoc, Joseph Guman, Joseph O'Brien
+
+# ## Import Libraries
+# Import all necessary libraries
 
 # First, import the necessary libraries
 from __future__ import print_function, division
@@ -14,11 +18,18 @@ import torch.optim as optim
 from torch.utils.data import Dataset
 from torchvision import utils
 import torchvision.transforms as transforms
+from torch.autograd import Variable
+
+# ## Import Models
+# Import all models (see `models/`).
 
 # Import Models
 from models.convbasic import ConvNeuralNet
 from models.plainnet import PlainNet
 from models.transferlearning import load_pretrained_model
+
+# ## Dataset Class
+# Handles Pre-Processing of all Images for CV Network
 
 '''
 Creating a Custom Image Dataset
@@ -31,10 +42,13 @@ class ImageDataset(Dataset):
             type_path: If either the train or test set
             transform (callable, optional): Optional transform to be applied
                 on a sample.
+            percent: how much percentage of the data to train on.
         """
         self.transform = transform
         self.type_path = type_path
         dalle_imgs = os.listdir('dataset/dalle')
+        
+        # Define the IDs (i.e., 00000, 01234) of the images in the chosen data.
         if (type_path is "train"):
             total_count = int((len(dalle_imgs) - 1) * percent)
             self.indices = [img[-9:-4] for img in dalle_imgs if (".jpg" in img)][:total_count]
@@ -58,15 +72,15 @@ class ImageDataset(Dataset):
         else:
             img_name = 'dataset/real/real-' + str(img_id) + '.jpg'
         
+        # Applying the image transformations and returning the data object
         torch_img = Image.open(img_name)
         if (self.transform):
             torch_img = self.transform(torch_img)
-        sample = {'image': torch_img, 'label': data_half}
-        return (sample['image'], sample['label'])
+        return (torch_img, data_half)
 
-'''
-Create plots for training and test accuracies for several epochs.
-'''
+# ## Helper Function to Plot Metrics
+# Plot training and test accuracies.
+
 def plot_metrics(metric_set, metric_name, save_path):
     fig, ax = plt.subplots()
     ax.plot(metric_set)
@@ -74,13 +88,13 @@ def plot_metrics(metric_set, metric_name, save_path):
         title='Training ' + metric_name)
     fig.savefig('graphs/' + save_path)
 
-'''
-Training the model!
-'''
-def train_model(transform, batch_size, epochs, weights_path, model_type, network):
+# ## Helper Function to Train Model
+# Train the model.
+
+def train_model(transform, batch_size, epochs, weights_path, model_type, network, threshold, proportion):
     # Loading in initial training data
     print("Loading in training data...")
-    train_data = ImageDataset(type_path="train", transform=transform, percent=0.5)
+    train_data = ImageDataset(type_path="train", transform=transform, percent=proportion)
     trainloader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,
                                             shuffle=True)
     print("Done loading in training data.\n")
@@ -96,10 +110,12 @@ def train_model(transform, batch_size, epochs, weights_path, model_type, network
     print("Start Training!\n")
     training_losses = []
     training_accuracies = []
-    for epoch in range(epochs):
-
+    
+    # Iterate for max epochs or until convergence
+    curr_epoch = 0
+    while (curr_epoch < epochs and ((len(training_losses) < 2) or (abs(training_losses[-1] - training_losses[-2]) >= threshold))):
         # Reset the loss and correct
-        print("Epoch " + str(epoch + 1))
+        print("Epoch " + str(curr_epoch + 1))
         running_loss = 0.0
         correct = 0
 
@@ -121,7 +137,6 @@ def train_model(transform, batch_size, epochs, weights_path, model_type, network
             # Calculate accuracy and loss
             _, predicted = torch.max(outputs.cpu().data, 1)
             correct += (predicted == labels).float().sum()
-            #_, predicted = torch.max(outputs.cpu().data, 1)
             running_loss += outputs.cpu().shape[0] * loss.item()
         
         # Calculation of the accuracy and loss
@@ -133,6 +148,7 @@ def train_model(transform, batch_size, epochs, weights_path, model_type, network
         # Appending to the arrays to look at further visualization
         training_losses.append(total_loss)
         training_accuracies.append(accuracy)
+        curr_epoch += 1
 
     # Saving trained model
     print("Finished Training!\n")
@@ -141,10 +157,11 @@ def train_model(transform, batch_size, epochs, weights_path, model_type, network
     # Graph out training loss and accuracy over time
     plot_metrics(training_losses, 'Loss', model_type + '_training_loss.png')
     plot_metrics(training_accuracies, 'Accuracy', model_type + '_training_accuracies.png')
+    return training_losses[-1], training_accuracies[-1]
 
-'''
-Testing the model!
-'''
+# ## Helper Function to Test the Model
+# Testing the model.
+
 def test_model(transform, weights_path, batch_size, network):
     # Loading in initial test data
     print("\nLoading in test data...")
@@ -166,7 +183,8 @@ def test_model(transform, weights_path, batch_size, network):
     # Getting accuracy of the data
     correct = 0
     total = 0
-    # since we're not training, we don't need to calculate the gradients for our outputs
+    
+    # Since we're not training, we don't need to calculate the gradients for our outputs
     with torch.no_grad():
         for data in testloader:
             images, labels = data
@@ -175,15 +193,18 @@ def test_model(transform, weights_path, batch_size, network):
             outputs = net(images_cuda)
             # the class with the highest energy is what we choose as prediction
             _, predicted = torch.max(outputs.cpu().data, 1)
+            print(labels)
+            print(predicted)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
     
     # Print out accuracy!
-    print('Accuracy of the network on the ' + str(len(test_data)) + ' test images: ' + str(100 * correct // total) + '%')
+    print('Accuracy of the network on the ' + str(len(test_data)) + ' test images: ' + str(100 * correct / total) + '%')
+    return 100 * correct / total
 
-'''
-Main hub of setting the hyperparameters, and then calling training and testing for the model.
-'''
+# ## Main Function
+# Runs all of the necessary functions!
+
 def main(model_type):
     # Map of all possible transforms
     data_transforms = {
@@ -211,23 +232,102 @@ def main(model_type):
     }
     model = models[model_type]
   
-    # Batch size
+    # Batch size, max epochs, and threshold for convergence
     batch_size = 200
+    max_epochs = 15
+    threshold = 0.005
+    
+    # Look at different proportions of data and train + test accs
+    train_accs = []
+    test_accs = []
+    proportions = [0.5, 0.6, 0.7, 0.8, 0.9]
+    
+    # Train + test the data
+    for prop in proportions:
+        PATH = 'weights/' + model_type + '-' + str(prop) + '.pth'
+        training_loss, training_accuracy = train_model(transform=data_transforms[model_type], batch_size=batch_size, epochs=max_epochs, weights_path=PATH, model_type=model_type, network=model, threshold=threshold, proportion=prop)
+        test_accuracy = test_model(data_transforms[model_type], PATH, batch_size, network=model)
+        
+        # Update train and test accuracies
+        train_accs.append(training_accuracy)
+        test_accs.append(test_accuracy)
+    return train_accs, test_accs
 
-    # Training and testing the model
-    PATH = 'weights/' + model_type + '.pth'
-    train_model(transform=data_transforms[model_type], batch_size=batch_size, epochs=10, weights_path=PATH, model_type=model_type, network=model)
-    test_model(data_transforms[model_type], PATH, batch_size, network=model)
+# ## Run all code!
+# Runs all of the code for Transfer Learning.
 
-'''
-Run main and then perform everything
-'''
+# +
+final_train = []
+final_test = []
+
 if __name__ == '__main__':
-    #models = ["ConvBasic", "TransferLearning"]
-    models = ["TransferLearning"]
-    for model in models:
-        main(model_type=model)
+    train_accs, test_accs = main(model_type = "TransferLearning")
+    
+    final_train = train_accs
+    final_test = test_accs
+# -
 
+proportions = [0.5, 0.6, 0.7, 0.8, 0.9]
+print(final_train)
+print(final_test)
 
+plt.plot(proportions, final_train)
+plt.plot(proportions, final_test)
 
+# ## Dummy Code
+# For experimentation with the doggos.
 
+# +
+# Create model, attach to CUDA
+net = load_pretrained_model()
+if (torch.cuda.is_available()):
+    net.to('cuda')
+net.load_state_dict(torch.load('weights/TransferLearning-0.9.pth'))
+
+reference_imgs = [img for img in os.listdir("dataset/real") if ".jpg" in img]
+#reference_imgs = [img for img in os.listdir("reference") if ".png" in img]
+tf_transforms = transforms.Compose([
+        transforms.Grayscale(num_output_channels=3),
+        transforms.CenterCrop(250),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+with torch.no_grad():
+    for img in reference_imgs:
+    # Load in image
+        torch_img = Image.open("dataset/real/" + img)
+        #torch_img = Image.open("reference/" + img)
+        torch_img = tf_transforms(torch_img)
+        torch_img = torch_img.cuda()
+        #torch_img = torch_img.unsqueeze(1)
+        #print(torch_img)
+        outputs = net(torch_img[None, ...])
+        # the class with the highest energy is what we choose as prediction
+        #print(outputs.cpu().data)
+        _, predicted = torch.max(outputs.cpu().data, 1)
+        print(predicted)
+#total += labels.size(0)
+#correct += (predicted == labels).sum().item()
+# +
+net = load_pretrained_model()
+if (torch.cuda.is_available()):
+    net.to('cuda')
+net.load_state_dict(torch.load('weights/TransferLearning-0.9.pth'))
+
+loader = transforms.Compose([
+        transforms.Grayscale(num_output_channels=3),
+        transforms.CenterCrop(250),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+
+def image_loader(image_name):
+    """load image, returns cuda tensor"""
+    image = Image.open(image_name)
+    image = loader(image).float()
+    image = Variable(image, requires_grad=True)
+    image = image.unsqueeze(0)  #this is for VGG, may not be needed for ResNet
+    return image.cuda()  #assumes that you're using GPU
+
+image = image_loader("dataset/real/real-00001.jpg")
+
+outputs = net(image)
+print(outputs)
