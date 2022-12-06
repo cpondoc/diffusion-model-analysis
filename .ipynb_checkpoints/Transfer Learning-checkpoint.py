@@ -20,6 +20,13 @@ from torchvision import utils
 import torchvision.transforms as transforms
 from torch.autograd import Variable
 
+# Joeys figuring stuff out
+from torchcam.methods import SmoothGradCAMpp
+from torchcam.utils import overlay_mask
+from torchvision.transforms.functional import to_pil_image
+from PIL import Image 
+import PIL 
+
 # ## Import Models
 # Import all models (see `models/`).
 
@@ -76,7 +83,7 @@ class ImageDataset(Dataset):
         torch_img = Image.open(img_name)
         if (self.transform):
             torch_img = self.transform(torch_img)
-        return (torch_img, data_half)
+        return (torch_img, data_half, img_name)
 
 # ## Helper Function to Plot Metrics
 # Plot training and test accuracies.
@@ -122,7 +129,7 @@ def train_model(transform, batch_size, epochs, weights_path, model_type, network
         # Iterate through each batch
         for i, data in enumerate(trainloader, 0):
             # Get batch data and zero parameter gradients
-            inputs, labels = data
+            inputs, labels, img_names = data
             inputs_cuda, labels_cuda = inputs.cuda(), labels.cuda()
             optimizer.zero_grad()
 
@@ -172,7 +179,7 @@ def test_model(transform, weights_path, batch_size, network):
 
     # Test Loading
     dataiter = iter(testloader)
-    images, labels = next(dataiter)
+    images, labels, img_names = next(dataiter)
 
     # Loading in a new example of the neural net, and loading in the weights
     net = network
@@ -185,18 +192,63 @@ def test_model(transform, weights_path, batch_size, network):
     total = 0
     
     # Since we're not training, we don't need to calculate the gradients for our outputs
-    with torch.no_grad():
-        for data in testloader:
-            images, labels = data
-            images_cuda, labels_cuda = images.cuda(), labels.cuda()
-            # calculate outputs by running images through the network
+    #with torch.no_grad():
+    cam_extractor = SmoothGradCAMpp(net)
+    for data in testloader:
+        images, labels, img_names = data
+        images_cuda, labels_cuda = images.cuda(), labels.cuda()
+        
+        """
+        HEATMAP CODE
+        for image_cuda, img_name in zip(images_cuda, img_names):
+            out = net(image_cuda.unsqueeze(0))
+            activation_map = cam_extractor(out.cpu().squeeze(0).argmax().item(), out.cpu())
+
+            current_image = Image.open(img_name)
+            
+            make_tensor = transforms.ToTensor()
+            current_image = make_tensor(current_image)
+            
+            crop_tensor = transforms.CenterCrop(224)
+            current_image = crop_tensor(current_image)
+            
+            result = overlay_mask(to_pil_image(current_image), to_pil_image(activation_map[0].cpu().squeeze(0), mode='F'), alpha=0.5)
+            plt.imshow(result); plt.axis('off'); 
+            plt.tight_layout();
+            name = "heatmaps/" + "heatmap_of_"+img_name.split('/')[-1]
+            plt.savefig(name)
+        """
+        
+        
+        with torch.no_grad():
+            # Chris Stuff
             outputs = net(images_cuda)
+
             # the class with the highest energy is what we choose as prediction
             _, predicted = torch.max(outputs.cpu().data, 1)
             print(labels)
             print(predicted)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+
+
+        """ CHRIS CODE BROSKI
+        images, labels = data
+        images_cuda, labels_cuda = images.cuda(), labels.cuda()
+        # calculate outputs by running images through the network
+        outputs = net(images_cuda)
+
+        for output in outputs:
+            print(output)
+            print("BRUH")
+
+        # the class with the highest energy is what we choose as prediction
+        _, predicted = torch.max(outputs.cpu().data, 1)
+        print(labels)
+        print(predicted)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+        """
     
     # Print out accuracy!
     print('Accuracy of the network on the ' + str(len(test_data)) + ' test images: ' + str(100 * correct / total) + '%')
@@ -211,15 +263,15 @@ def main(model_type):
         'PlainNet': transforms.Compose(
         [transforms.ToTensor(),
         transforms.Grayscale(num_output_channels=3),
-        transforms.CenterCrop(250)]),
+        transforms.CenterCrop(224)]), # CHANGED FROM 250
         'ConvBasic': transforms.Compose(
         [transforms.Grayscale(num_output_channels=3),
-        transforms.CenterCrop(250),
+        transforms.CenterCrop(224), # CHANGED FROM 250
          transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
         'TransferLearning': transforms.Compose([
         transforms.Grayscale(num_output_channels=3),
-        transforms.CenterCrop(250),
+        transforms.CenterCrop(224),# CHANGED FROM 250
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
     }
@@ -240,12 +292,12 @@ def main(model_type):
     # Look at different proportions of data and train + test accs
     train_accs = []
     test_accs = []
-    proportions = [0.5, 0.6, 0.7, 0.8, 0.9]
+    proportions = [0.9] #[0.5, 0.6, 0.7, 0.8, 0.9]
     
     # Train + test the data
     for prop in proportions:
         PATH = 'weights/' + model_type + '-' + str(prop) + '.pth'
-        training_loss, training_accuracy = train_model(transform=data_transforms[model_type], batch_size=batch_size, epochs=max_epochs, weights_path=PATH, model_type=model_type, network=model, threshold=threshold, proportion=prop)
+        #training_loss, training_accuracy = train_model(transform=data_transforms[model_type], batch_size=batch_size, epochs=max_epochs, weights_path=PATH, model_type=model_type, network=model, threshold=threshold, proportion=prop)
         test_accuracy = test_model(data_transforms[model_type], PATH, batch_size, network=model)
         
         # Update train and test accuracies

@@ -1,3 +1,5 @@
+# %pip install torchcam
+
 '''
 Finetuning existing ResNet model
 '''
