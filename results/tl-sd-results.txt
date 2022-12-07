@@ -1,0 +1,161 @@
+Proportion of Training Data: 50.0
+
+Loading in training data...
+Done loading in training data.
+
+Start Training!
+
+Epoch 1
+Loss = 0.44490046093649477
+Accuracy = 78.89192199707031
+
+Epoch 2
+Loss = 0.17979065344720177
+Accuracy = 94.0629653930664
+
+Epoch 3
+Loss = 0.13169154100005556
+Accuracy = 95.37680053710938
+
+Epoch 4
+Loss = 0.10649733136402952
+Accuracy = 96.145263671875
+
+Epoch 5
+Loss = 0.08889687787159635
+Accuracy = 96.82697296142578
+
+Epoch 6
+Loss = 0.0725981111116024
+Accuracy = 97.66980743408203
+
+Epoch 7
+Loss = 0.061887306018548256
+Accuracy = 97.96727752685547
+
+Epoch 8
+Loss = 0.05369829969368894
+Accuracy = 98.40109252929688
+
+Epoch 9
+Loss = 0.04686276111373171
+Accuracy = 98.5870132446289
+
+Epoch 10
+Loss = 0.041680267159159845
+Accuracy = 98.90927124023438
+
+Epoch 11
+Loss = 0.03317464585012
+Accuracy = 99.30590057373047
+
+Epoch 12
+Loss = 0.02898035165020364
+Accuracy = 99.35547637939453
+
+Finished Training!
+
+
+Loading in test data...
+Done loading in test data.
+Accuracy of the network on the 1612 test images: 97.27047146401985%
+Proportion of Training Data: 60.0
+
+Loading in training data...
+Done loading in training data.
+
+Start Training!
+
+Epoch 1
+Loss = 0.035814333842146544
+Accuracy = 99.10142517089844
+
+Epoch 2
+Loss = 0.030564213507500743
+Accuracy = 99.25635528564453
+
+Epoch 3
+Loss = 0.02519545277037716
+Accuracy = 99.51456451416016
+
+Epoch 4
+Loss = 0.021645687288106213
+Accuracy = 99.57653045654297
+
+Finished Training!
+
+
+Loading in test data...
+Done loading in test data.
+Accuracy of the network on the 1612 test images: 97.64267990074441%
+Proportion of Training Data: 70.0
+
+Loading in training data...
+Done loading in training data.
+
+Start Training!
+
+Epoch 1
+Loss = 0.027511212116017644
+Accuracy = 99.32719421386719
+
+Epoch 2
+Loss = 0.021675221876586884
+Accuracy = 99.54851531982422
+
+Epoch 3
+Loss = 0.021202932061791083
+Accuracy = 99.49539947509766
+
+Finished Training!
+
+
+Loading in test data...
+Done loading in test data.
+Accuracy of the network on the 1612 test images: 97.20843672456576%
+Proportion of Training Data: 80.0
+
+Loading in training data...
+Done loading in training data.
+
+Start Training!
+
+Epoch 1
+Loss = 0.025669260755596838
+Accuracy = 99.3493423461914
+
+Epoch 2
+Loss = 0.020533113256327687
+Accuracy = 99.55073547363281
+
+Epoch 3
+Loss = 0.016280543882945173
+Accuracy = 99.63594055175781
+
+Finished Training!
+
+
+Loading in test data...
+Done loading in test data.
+Accuracy of the network on the 1612 test images: 97.64267990074441%
+Proportion of Training Data: 90.0
+
+Loading in training data...
+Done loading in training data.
+
+Start Training!
+
+Epoch 1
+Loss = 0.022891634214680753
+Accuracy = 99.37345123291016
+
+Epoch 2
+Loss = 0.018326165154063316
+Accuracy = 99.54557800292969
+
+Finished Training!
+
+
+Loading in test data...
+Done loading in test data.
+Accuracy of the network on the 1612 test images: 97.45657568238214%

@@ -53,15 +53,15 @@ class ImageDataset(Dataset):
         """
         self.transform = transform
         self.type_path = type_path
-        dalle_imgs = os.listdir('dataset/dalle')
+        dalle_imgs = os.listdir('dataset/stable-diffusion')
         
         # Define the IDs (i.e., 00000, 01234) of the images in the chosen data.
         if (type_path is "train"):
             total_count = int((len(dalle_imgs) - 1) * percent)
-            self.indices = [img[-9:-4] for img in dalle_imgs if (".jpg" in img)][:total_count]
+            self.indices = [img[-9:-4] for img in dalle_imgs if (".png" in img)][:total_count]
         else:
             total_count = int((len(dalle_imgs) - 1) * 0.1)
-            self.indices = [img[-9:-4] for img in dalle_imgs if (".jpg" in img)][-total_count:]
+            self.indices = [img[-9:-4] for img in dalle_imgs if (".png" in img)][-total_count:]
             
     def __len__(self):
         return len(self.indices) * 2
@@ -75,7 +75,7 @@ class ImageDataset(Dataset):
         img_id = self.indices[data_index]
         img_name = None
         if (data_half == 0):
-            img_name = 'dataset/dalle/dalle-' + str(img_id) + '.jpg'
+            img_name = 'dataset/stable-diffusion/stable-' + str(img_id) + '.png'
         else:
             img_name = 'dataset/real/real-' + str(img_id) + '.jpg'
         
@@ -100,6 +100,7 @@ def plot_metrics(metric_set, metric_name, save_path):
 
 def train_model(transform, batch_size, epochs, weights_path, model_type, network, threshold, proportion):
     # Loading in initial training data
+    print("Proportion of Training Data: " + str(proportion * 100) + "\n")
     print("Loading in training data...")
     train_data = ImageDataset(type_path="train", transform=transform, percent=proportion)
     trainloader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,
@@ -162,8 +163,8 @@ def train_model(transform, batch_size, epochs, weights_path, model_type, network
     torch.save(net.state_dict(), weights_path)
 
     # Graph out training loss and accuracy over time
-    plot_metrics(training_losses, 'Loss', model_type + '_training_loss.png')
-    plot_metrics(training_accuracies, 'Accuracy', model_type + '_training_accuracies.png')
+    plot_metrics(training_losses, 'Loss', model_type + '_' + str(proportion) + '_training_loss.png')
+    plot_metrics(training_accuracies, 'Accuracy', model_type + '_' + str(proportion) + '_training_accuracies.png')
     return training_losses[-1], training_accuracies[-1]
 
 # ## Helper Function to Test the Model
@@ -191,43 +192,40 @@ def test_model(transform, weights_path, batch_size, network):
     correct = 0
     total = 0
     
-    # Since we're not training, we don't need to calculate the gradients for our outputs
-    #with torch.no_grad():
+    # Generate heatmaps
+    '''print("Heatmaps")
     cam_extractor = SmoothGradCAMpp(net)
     for data in testloader:
         images, labels, img_names = data
         images_cuda, labels_cuda = images.cuda(), labels.cuda()
-        
-        """
-        HEATMAP CODE
         for image_cuda, img_name in zip(images_cuda, img_names):
-            out = net(image_cuda.unsqueeze(0))
-            activation_map = cam_extractor(out.cpu().squeeze(0).argmax().item(), out.cpu())
+                out = net(image_cuda.unsqueeze(0))
+                activation_map = cam_extractor(out.cpu().squeeze(0).argmax().item(), out.cpu())
 
-            current_image = Image.open(img_name)
-            
-            make_tensor = transforms.ToTensor()
-            current_image = make_tensor(current_image)
-            
-            crop_tensor = transforms.CenterCrop(224)
-            current_image = crop_tensor(current_image)
-            
-            result = overlay_mask(to_pil_image(current_image), to_pil_image(activation_map[0].cpu().squeeze(0), mode='F'), alpha=0.5)
-            plt.imshow(result); plt.axis('off'); 
-            plt.tight_layout();
-            name = "heatmaps/" + "heatmap_of_"+img_name.split('/')[-1]
-            plt.savefig(name)
-        """
-        
-        
-        with torch.no_grad():
-            # Chris Stuff
+                current_image = Image.open(img_name)
+
+                make_tensor = transforms.ToTensor()
+                current_image = make_tensor(current_image)
+
+                crop_tensor = transforms.CenterCrop(224)
+                current_image = crop_tensor(current_image)
+
+                result = overlay_mask(to_pil_image(current_image), to_pil_image(activation_map[0].cpu().squeeze(0), mode='F'), alpha=0.5)
+                plt.imshow(result); plt.axis('off'); 
+                plt.tight_layout();
+                name = "heatmaps/" + "heatmap_of_"+img_name.split('/')[-1]
+                plt.savefig(name)'''
+    
+    # Since we're not training, we don't need to calculate the gradients for our outputs
+    #with torch.no_grad():
+    with torch.no_grad():
+        for data in testloader:
+            images, labels, _ = data
+            images_cuda, labels_cuda = images.cuda(), labels.cuda()
             outputs = net(images_cuda)
 
             # the class with the highest energy is what we choose as prediction
             _, predicted = torch.max(outputs.cpu().data, 1)
-            print(labels)
-            print(predicted)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
@@ -261,9 +259,10 @@ def main(model_type):
     # Map of all possible transforms
     data_transforms = {
         'PlainNet': transforms.Compose(
-        [transforms.ToTensor(),
-        transforms.Grayscale(num_output_channels=3),
-        transforms.CenterCrop(224)]), # CHANGED FROM 250
+        [
+            transforms.ToTensor(),
+            transforms.Grayscale(num_output_channels=3),
+            transforms.CenterCrop(250)]), # CHANGED FROM 250
         'ConvBasic': transforms.Compose(
         [transforms.Grayscale(num_output_channels=3),
         transforms.CenterCrop(224), # CHANGED FROM 250
@@ -292,12 +291,12 @@ def main(model_type):
     # Look at different proportions of data and train + test accs
     train_accs = []
     test_accs = []
-    proportions = [0.9] #[0.5, 0.6, 0.7, 0.8, 0.9]
+    proportions = [0.5, 0.6, 0.7, 0.8, 0.9]
     
     # Train + test the data
     for prop in proportions:
         PATH = 'weights/' + model_type + '-' + str(prop) + '.pth'
-        #training_loss, training_accuracy = train_model(transform=data_transforms[model_type], batch_size=batch_size, epochs=max_epochs, weights_path=PATH, model_type=model_type, network=model, threshold=threshold, proportion=prop)
+        training_loss, training_accuracy = train_model(transform=data_transforms[model_type], batch_size=batch_size, epochs=max_epochs, weights_path=PATH, model_type=model_type, network=model, threshold=threshold, proportion=prop)
         test_accuracy = test_model(data_transforms[model_type], PATH, batch_size, network=model)
         
         # Update train and test accuracies
@@ -323,8 +322,14 @@ proportions = [0.5, 0.6, 0.7, 0.8, 0.9]
 print(final_train)
 print(final_test)
 
-plt.plot(proportions, final_train)
-plt.plot(proportions, final_test)
+fig = plt.figure()
+fig, ax = plt.subplots()
+ax.plot(proportions, final_train, label="train accuracy")
+ax.plot(proportions, final_test, label="test accuracy")
+ax.set_xlabel('Proportion of Training Data')
+ax.set_ylabel('Percentage Accuracy')
+ax.set_title("Transfer Learning vs. Size of Training Data")
+ax.legend()
 
 # ## Dummy Code
 # For experimentation with the doggos.
