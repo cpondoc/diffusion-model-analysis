@@ -1,0 +1,57 @@
+Proportion of Training Data: 70.0
+
+Loading in training data...
+Done loading in training data.
+
+Start Training!
+
+Epoch 1
+Loss = 0.41631756294465944
+Accuracy = 79.61225128173828
+
+Epoch 2
+Loss = 0.1540397740372855
+Accuracy = 94.52903747558594
+
+Epoch 3
+Loss = 0.11176589987222263
+Accuracy = 95.99858093261719
+
+Epoch 4
+Loss = 0.08966302477277119
+Accuracy = 96.83959197998047
+
+Epoch 5
+Loss = 0.07538848825949362
+Accuracy = 97.45927429199219
+
+Epoch 6
+Loss = 0.06364979806010514
+Accuracy = 97.82223510742188
+
+Epoch 7
+Loss = 0.053549855462045916
+Accuracy = 98.30028533935547
+
+Epoch 8
+Loss = 0.04514722274378913
+Accuracy = 98.69865417480469
+
+Epoch 9
+Loss = 0.039560174741637144
+Accuracy = 98.86685180664062
+
+Epoch 10
+Loss = 0.03269520193858141
+Accuracy = 99.14128875732422
+
+Epoch 11
+Loss = 0.02837461440641929
+Accuracy = 99.33605194091797
+
+Finished Training!
+
+
+Loading in test data...
+Done loading in test data.
+Accuracy of the network on the 1612 test images: 97.02233250620347%
