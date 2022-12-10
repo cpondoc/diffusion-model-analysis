@@ -1,110 +1,44 @@
-# ## CS 229 Final Project - Prompt Analysis
-# Analyzing which prompts our network got wrong to better understand which prompts are adversarial.
-#
-# By: Christopher Pondoc, Joseph Guman, Joseph O'Brien
+# # Prompt Analysis
+# Using NLP to determine which prompts our network got wrong to better understand which prompts are best for each diffusion model.
 
 # ## Import Libraries
 # Import all necessary libraries
 
-# First, import the necessary libraries
-from __future__ import print_function, division
-import gc
-import matplotlib.pyplot as plt
-import os
-from PIL import Image
+# +
+from collections import Counter
+import nltk
+import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import Dataset
-from torchvision import utils
-import torchvision.transforms as transforms
-from torch.autograd import Variable
 
-# Joeys figuring stuff out
-from torchcam.methods import SmoothGradCAMpp
-from torchcam.utils import overlay_mask
-from torchvision.transforms.functional import to_pil_image
-from PIL import Image 
-import PIL 
+# For using NLTK later
+nltk.download('punkt')
+nltk.download('averaged_perceptron_tagger')
+# -
 
 # ## Import Models
-# Import all models (see `models/`).
+# For this case, we only import ResNet-18.
 
-# Import Models
-from models.convbasic import ConvNeuralNet
-from models.plainnet import PlainNet
 from models.transferlearning import load_pretrained_model
 
-# ## Dataset Class
-# Handles Pre-Processing of all Images for CV Network
+# ## Import Dataset Class and Transforms
+# Used to help load in the images for heatmap generation
 
-'''
-Creating a Custom Image Dataset
-'''
-class ImageDataset(Dataset):
+from utilities.dataset import ImageDataset
+from utilities.transforms import data_transforms
 
-    def __init__(self, type_path=None, transform=None, percent=0.9):
-        """
-        Args:
-            type_path: If either the train or test set
-            transform (callable, optional): Optional transform to be applied
-                on a sample.
-            percent: how much percentage of the data to train on.
-        """
-        self.transform = transform
-        self.type_path = type_path
-        dalle_imgs = os.listdir('dataset/stable-diffusion')
-        
-        # Define the IDs (i.e., 00000, 01234) of the images in the chosen data.
-        if (type_path is "train"):
-            total_count = int((len(dalle_imgs) - 1) * percent)
-            self.indices = [img[-9:-4] for img in dalle_imgs if (".png" in img)][:total_count]
-        else:
-            total_count = int((len(dalle_imgs) - 1) * 0.1)
-            self.indices = [img[-9:-4] for img in dalle_imgs if (".png" in img)][-total_count:]
-            
-    def __len__(self):
-        return len(self.indices) * 2
 
-    def __getitem__(self, id):
-        # Calculate whether real or DALLE
-        data_half = int(id / len(self.indices))
-        data_index = id % len(self.indices)
-        
-        # Find corresponding index of image
-        img_id = self.indices[data_index]
-        img_name = None
-        if (data_half == 0):
-            img_name = 'dataset/stable-diffusion/stable-' + str(img_id) + '.png'
-        else:
-            img_name = 'dataset/real/real-' + str(img_id) + '.jpg'
-        
-        # Applying the image transformations and returning the data object
-        torch_img = Image.open(img_name)
-        if (self.transform):
-            torch_img = self.transform(torch_img)
-        return (torch_img, data_half, img_name)
+# ## Function to Determine Confusion Matrix
+# The same framework as testing through the model, and then looking at prediction and output.
 
-# ## Helper Function to Plot Metrics
-# Plot training and test accuracies.
-
-def plot_metrics(metric_set, metric_name, save_path):
-    fig, ax = plt.subplots()
-    ax.plot(metric_set)
-    ax.set(xlabel='epochs', ylabel=metric_name,
-        title='Training ' + metric_name)
-    fig.savefig('graphs/' + save_path)
-
-# ## Helper Function to Test the Model
-# Testing the model.
-
-def generate_confusion_matrix(transform, weights_path, batch_size, network):
-    # Loading in initial test data
-    print("\nLoading in test data...")
-    test_data = ImageDataset(type_path="test", transform=transform)
+def generate_confusion_matrix(transform, weights_path, batch_size, network, first, second):
+    # Loading in initial data
+    print("\nLoading in data...")
+    test_data = ImageDataset("test", transform, 0.6, first, second)
     testloader = torch.utils.data.DataLoader(test_data, batch_size=batch_size,
                                             shuffle=True)
-    print("Done loading in test data.")
+    print("Done loading in data.")
 
     # Test Loading
     dataiter = iter(testloader)
@@ -115,32 +49,32 @@ def generate_confusion_matrix(transform, weights_path, batch_size, network):
     if (torch.cuda.is_available()):
         net.to('cuda')
     net.load_state_dict(torch.load(weights_path))
-
-    # Getting accuracy of the data
-    correct = 0
-    total = 0
     
-    # Generate heatmaps
+    # Generate confusion matrix -- also count all real but fake images, and all images
     print("Generate Confusion Matrix")
     matrix = [[0, 0], [0, 0]]
     real_but_fake = []
     all_images = []
+    
+    # Perform same as testing/inferencing, but logging data.
     with torch.no_grad():
         for data in testloader:
             images, labels, paths = data
             for i in range(len(paths)):
                 all_images.append(paths[i])
             images_cuda, labels_cuda = images.cuda(), labels.cuda()
+            
+            # Feed the images through our network and evaluate them
             outputs = net(images_cuda)
-
-            # the class with the highest energy is what we choose as prediction
             _, predicted = torch.max(outputs.cpu().data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+            
+            # Calculate the right part of the matrix of prediction and actual
             for i in range(len(predicted)):
                 prediction = int(predicted[i].item())
                 actual = int(labels[i].item())
                 matrix[prediction][actual] += 1
+                
+                # Adding to set of images to further analyze if real, but fake
                 if (prediction is 1 and actual is 0):
                     real_but_fake.append(paths[i])
     
@@ -149,116 +83,109 @@ def generate_confusion_matrix(transform, weights_path, batch_size, network):
 # ## Main Function
 # Runs all of the necessary functions!
 
-def main(model_type):
-    # Map of all possible transforms
-    data_transforms = {
-        'ConvBasic': transforms.Compose(
-        [transforms.Grayscale(num_output_channels=3),
-        transforms.CenterCrop(250), # CHANGED FROM 250
-         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
-        'TransferLearning': transforms.Compose([
-        transforms.Grayscale(num_output_channels=3),
-        transforms.CenterCrop(224),# CHANGED FROM 250
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-    }
-
-    # Map of all possible models
-    models = {
-        'ConvBasic': ConvNeuralNet(),
-        'TransferLearning': load_pretrained_model()
-    }
-    model = models[model_type]
-  
-    # Batch size, max epochs, and threshold for convergence
-    batch_size = 200
-    max_epochs = 15
-    threshold = 0.005
-    
-    # Look at different proportions of data and train + test accs
-    proportions = [0.6]
-    
+def main(model_type, weights, first, second):
     # Generate the necessary heatmaps
-    matrix, real_but_fake, all_images = None, None, None
-    for prop in proportions:
-        PATH = 'weights/TransferLearning/stable-diffusion/TransferLearning-0.6.pth'
-        matrix, real_but_fake, all_images = generate_confusion_matrix(data_transforms[model_type], PATH, batch_size, network=model)
+    model = load_pretrained_model()
+    matrix, real_but_fake, all_images = generate_confusion_matrix(data_transforms[model_type], weights, 200, model, first, second)
     
     return matrix, real_but_fake, all_images
 
 # ## Run all code!
 # Runs all of the code for Transfer Learning.
 
-matrix, real_but_fake, all_images = main(model_type = "TransferLearning")
-
+matrix, real_but_fake, all_images = main(model_type = "TransferLearning", weights = 'weights/TransferLearning/stable-diffusion/TransferLearning-0.6.pth', first='stable-diffusion', second='real')
 print(matrix)
 
-# ## Simplistic Linguistic Analysis
-# Using NLTK to look at some simple data.
 
-# +
-import nltk
-nltk.download('punkt')
-nltk.download('averaged_perceptron_tagger')
-import pandas as pd
-from collections import Counter
-import numpy as np
-df = pd.read_csv('dataset/reference.csv')
+# ## Function for Total Number of Nouns + Length
+# Using NLTK to calculate total number of nouns and length (number of words).
 
-total = 0
-all_nouns = []
-all_lengths = []
-for img in all_images:
-    index = int(img[-9:-4])
-    description = df.iloc[index]['description']
+def nouns_and_tokens(description):
     tokens = nltk.word_tokenize(description)
     tagged = nltk.pos_tag(tokens)
     counts = Counter(tag for word,tag in tagged)
     num_nouns = counts['NN'] + counts['NNS'] + counts['NNP'] + counts['NNPS']
-    total += num_nouns
-    all_nouns.append(num_nouns)
-    all_lengths.append(len(tokens))
+    return num_nouns, tokens
 
-print("Entire Test Set:\n")
-print("Number of Nouns:")
-print("Mean: " + str(np.mean(all_nouns)))
-print("Variance: " + str(np.var(all_nouns)))
-print("")
 
-print("Length of Message:")
-print("Mean: " + str(np.mean(all_lengths)))
-print("Variance: " + str(np.var(all_lengths)))
-print("")
+# ## Function for Linguistic Analysis
+# Using the above function by looking at a specific dataset.
 
-total = 0
-rbf_nouns = []
-rbf_lengths = []
-print(len(real_but_fake))
-for img in real_but_fake:
-    print(img)
-    index = int(img[-9:-4])
-    description = df.iloc[index]['description']
-    tokens = nltk.word_tokenize(description)
-    tagged = nltk.pos_tag(tokens)
-    counts = Counter(tag for word,tag in tagged)
-    num_nouns = counts['NN'] + counts['NNS'] + counts['NNP'] + counts['NNPS']
-    total += num_nouns
-    rbf_nouns.append(num_nouns)
-    rbf_lengths.append(len(tokens))
+def linguistic_analysis(all_images):
+    # Used to refer to mappings
+    df = pd.read_csv('dataset/reference.csv')
     
-print("Images classified as real, but fake:\n")    
-print("Number of Nouns:")
-print("Mean: " + str(np.mean(rbf_nouns)))
-print("Variance: " + str(np.var(rbf_nouns)))
-print("")
+    # Keeping track of total nouns and lengths
+    total = 0
+    all_nouns = []
+    all_lengths = []
+    
+    # Iterate through each imags and calculate
+    for img in all_images:
+        # Grab the description
+        index = int(img[-9:-4])
+        description = df.iloc[index]['description']
+        
+        # Update nouns and tokens variables
+        num_nouns, tokens = nouns_and_tokens(description)
+        total += num_nouns
+        all_nouns.append(num_nouns)
+        all_lengths.append(len(tokens))
+    
+    # Print out statistics on number of nouns
+    print("Number of Nouns:")
+    print("Mean: " + str(np.mean(all_nouns)))
+    print("Variance: " + str(np.var(all_nouns)))
+    print("")
+    
+    # Print out statistics on lengths
+    print("Length of Message:")
+    print("Mean: " + str(np.mean(all_lengths)))
+    print("Variance: " + str(np.var(all_lengths)))
+    print("")
 
-print("Length of Message:")
-print("Mean: " + str(np.mean(rbf_lengths)))
-print("Variance: " + str(np.var(rbf_lengths)))
-print("")
+# ## Function to Print Specific Nouns
+# We can use this information to suggest an adversarial dataset.
+
+
+def specific_nouns(all_images):
+    # Keeping track of all nouns and the tags for nouns
+    all_nouns = []
+    noun_tags = ['NN', 'NNS', 'NNP', 'NNPS']
+    
+    # Iterate through each image
+    for img in all_images:
+        # Get the description
+        index = int(img[-9:-4])
+        description = df.iloc[index]['description']
+        
+        # Get the tokens and their tags
+        tokens = nltk.word_tokenize(description)
+        tagged = nltk.pos_tag(tokens)
+        
+        # Add to set if a noun
+        for word, tag in tagged:
+            if (tag in noun_tags):
+                all_nouns.append(word)
+    
+    return all_nouns
+
+
+# ## Applying Linguistic Analysis Functions
+# Calling above functions to print out data!
+
 # +
-#super awesome bootstrapping techniques
+print("Analyzing All Images:")
+linguistic_analysis(all_images)
+
+print("\nAnalyzing Real, but Fake Images:")
+linguistic_analysis(real_but_fake)
+
+
+# -
+# ## Super Awesome Bootstrapping Techniques!
+# Ensuring statistical significance to make claims.
+
 def bootstrapping(total_observations, subsection_of_interest):
     sample_mean = np.mean(total_observations)
     mean_difference = abs(sample_mean - np.mean(subsection_of_interest))
@@ -271,35 +198,18 @@ def bootstrapping(total_observations, subsection_of_interest):
             count += 1
     print(count / iteration_count)
 
-#checking statistical significance of our findings
+
+# ## Calculating Statistical Significance
+# Calling above function!
+
 print("Running simple bootstrapping to test against null hypothesis")
 print("Statistical significance of prompt lengths")
 bootstrapping(all_lengths, rbf_lengths)
 print("Statistical significance of noun counts")
 bootstrapping(all_nouns, rbf_nouns)
-# -
 
-# ## Looking for Specific Nouns
-# We can then look for prompts that have these nouns to create an adversarial dataset.
+# ## Looking at Nouns in Real, but Fake
+# See motivation above!
 
-
-noun_tags = ['NN', 'NNS', 'NNP', 'NNPS']
-for img in real_but_fake:
-    index = int(img[-9:-4])
-    description = df.iloc[index]['description']
-    tokens = nltk.word_tokenize(description)
-    tagged = nltk.pos_tag(tokens)
-    for word, tag in tagged:
-        if (tag in noun_tags):
-            print(word)
-    #counts = Counter(tag for word,tag in tagged)
-    #num_nouns = counts['NN'] + counts['NNS'] + counts['NNP'] + counts['NNPS']
-    #total += num_nouns
-    #rbf_nouns.append(num_nouns)
-    #rbf_lengths.append(len(tokens))
-
-# ## Printing the Confusion Matrix
-
-print(matrix)
-
-
+print("Looking at nouns of real, but fake images set:")
+print(specific_nouns(real_but_fake))

@@ -42,10 +42,10 @@ class ImageDataset(Dataset):
         # Define the IDs (i.e., 00000, 01234) of the images in the chosen data.
         if (type_path is "train"):
             total_count = int((len(model_imgs) - 1) * percent)
-            self.indices = [img[-9:-4] for img in model_imgs if (".jpg" in img)][:total_count]
+            self.indices = [img[-9:-4] for img in model_imgs if (self.model_map[self.first]['extension'] in img)][:total_count]
         else:
             total_count = int((len(model_imgs) - 1) * 0.1)
-            self.indices = [img[-9:-4] for img in model_imgs if (".jpg" in img)][-total_count:]
+            self.indices = [img[-9:-4] for img in model_imgs if (self.model_map[self.first]['extension'] in img)][-total_count:]
     
     '''
     Returns the length of the number of images in the dataset.
