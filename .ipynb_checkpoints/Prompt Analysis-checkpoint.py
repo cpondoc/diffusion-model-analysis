@@ -53,15 +53,15 @@ class ImageDataset(Dataset):
         """
         self.transform = transform
         self.type_path = type_path
-        dalle_imgs = os.listdir('dataset/stable-diffusion')
+        dalle_imgs = os.listdir('dataset/dalle')
         
         # Define the IDs (i.e., 00000, 01234) of the images in the chosen data.
         if (type_path is "train"):
             total_count = int((len(dalle_imgs) - 1) * percent)
-            self.indices = [img[-9:-4] for img in dalle_imgs if (".png" in img)][:total_count]
+            self.indices = [img[-9:-4] for img in dalle_imgs if (".jpg" in img)][:total_count]
         else:
             total_count = int((len(dalle_imgs) - 1) * 0.1)
-            self.indices = [img[-9:-4] for img in dalle_imgs if (".png" in img)][-total_count:]
+            self.indices = [img[-9:-4] for img in dalle_imgs if (".jpg" in img)][-total_count:]
             
     def __len__(self):
         return len(self.indices) * 2
@@ -75,7 +75,7 @@ class ImageDataset(Dataset):
         img_id = self.indices[data_index]
         img_name = None
         if (data_half == 0):
-            img_name = 'dataset/stable-diffusion/stable-' + str(img_id) + '.png'
+            img_name = 'dataset/dalle/dalle-' + str(img_id) + '.jpg'
         else:
             img_name = 'dataset/real/real-' + str(img_id) + '.jpg'
         
@@ -98,7 +98,7 @@ def plot_metrics(metric_set, metric_name, save_path):
 # ## Helper Function to Test the Model
 # Testing the model.
 
-def generate_heatmap(transform, weights_path, batch_size, network):
+def generate_confusion_matrix(transform, weights_path, batch_size, network):
     # Loading in initial test data
     print("\nLoading in test data...")
     test_data = ImageDataset(type_path="test", transform=transform)
@@ -122,9 +122,14 @@ def generate_heatmap(transform, weights_path, batch_size, network):
     
     # Generate heatmaps
     print("Generate Confusion Matrix")
+    matrix = [[0, 0], [0, 0]]
+    real_but_fake = []
+    all_images = []
     with torch.no_grad():
         for data in testloader:
-            images, labels, _ = data
+            images, labels, paths = data
+            for i in range(len(paths)):
+                all_images.append(paths[i])
             images_cuda, labels_cuda = images.cuda(), labels.cuda()
             outputs = net(images_cuda)
 
@@ -132,6 +137,14 @@ def generate_heatmap(transform, weights_path, batch_size, network):
             _, predicted = torch.max(outputs.cpu().data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+            for i in range(len(predicted)):
+                prediction = int(predicted[i].item())
+                actual = int(labels[i].item())
+                matrix[prediction][actual] += 1
+                if (prediction is 1 and actual is 0):
+                    real_but_fake.append(paths[i])
+    
+    return matrix, real_but_fake, all_images
 
 # ## Main Function
 # Runs all of the necessary functions!
@@ -139,11 +152,6 @@ def generate_heatmap(transform, weights_path, batch_size, network):
 def main(model_type):
     # Map of all possible transforms
     data_transforms = {
-        'PlainNet': transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Grayscale(num_output_channels=3),
-            transforms.CenterCrop(250)]), # CHANGED FROM 250
         'ConvBasic': transforms.Compose(
         [transforms.Grayscale(num_output_channels=3),
         transforms.CenterCrop(250), # CHANGED FROM 250
@@ -158,7 +166,6 @@ def main(model_type):
 
     # Map of all possible models
     models = {
-        'PlainNet': PlainNet(),
         'ConvBasic': ConvNeuralNet(),
         'TransferLearning': load_pretrained_model()
     }
@@ -173,14 +180,103 @@ def main(model_type):
     proportions = [0.6]
     
     # Generate the necessary heatmaps
+    matrix, real_but_fake, all_images = None, None, None
     for prop in proportions:
-        PATH = 'weights/TransferLearning/stable-diffusion/TransferLearning-0.6.pth'
-        generate_heatmap(data_transforms[model_type], PATH, batch_size, network=model)
-        
-    return train_accs, test_accs
+        PATH = 'weights/TransferLearning/dalle/TransferLearning-0.6.pth'
+        matrix, real_but_fake, all_images = generate_confusion_matrix(data_transforms[model_type], PATH, batch_size, network=model)
+    
+    return matrix, real_but_fake, all_images
 
 # ## Run all code!
 # Runs all of the code for Transfer Learning.
 
-if __name__ == '__main__':
-    main(model_type = "TransferLearning")
+matrix, real_but_fake, all_images = main(model_type = "TransferLearning")
+
+# ## Simplistic Linguistic Analysis
+# Using NLTK to look at some simple data.
+
+# +
+import nltk
+nltk.download('punkt')
+nltk.download('averaged_perceptron_tagger')
+import pandas as pd
+from collections import Counter
+import numpy as np
+df = pd.read_csv('dataset/reference.csv')
+
+total = 0
+all_nouns = []
+all_lengths = []
+for img in all_images:
+    index = int(img[-9:-4])
+    description = df.iloc[index]['description']
+    tokens = nltk.word_tokenize(description)
+    tagged = nltk.pos_tag(tokens)
+    counts = Counter(tag for word,tag in tagged)
+    num_nouns = counts['NN'] + counts['NNS'] + counts['NNP'] + counts['NNPS']
+    total += num_nouns
+    all_nouns.append(num_nouns)
+    all_lengths.append(len(tokens))
+
+print("Entire Test Set:\n")
+print("Number of Nouns:")
+print("Mean: " + str(np.mean(all_nouns)))
+print("Variance: " + str(np.var(all_nouns)))
+print("")
+
+print("Length of Message:")
+print("Mean: " + str(np.mean(all_lengths)))
+print("Variance: " + str(np.var(all_lengths)))
+print("")
+
+total = 0
+rbf_nouns = []
+rbf_lengths = []
+print(len(real_but_fake))
+for img in real_but_fake:
+    print(img)
+    index = int(img[-9:-4])
+    description = df.iloc[index]['description']
+    tokens = nltk.word_tokenize(description)
+    tagged = nltk.pos_tag(tokens)
+    counts = Counter(tag for word,tag in tagged)
+    num_nouns = counts['NN'] + counts['NNS'] + counts['NNP'] + counts['NNPS']
+    total += num_nouns
+    rbf_nouns.append(num_nouns)
+    rbf_lengths.append(len(tokens))
+    
+print("Images classified as real, but fake:\n")    
+print("Number of Nouns:")
+print("Mean: " + str(np.mean(rbf_nouns)))
+print("Variance: " + str(np.var(rbf_nouns)))
+print("")
+
+print("Length of Message:")
+print("Mean: " + str(np.mean(rbf_lengths)))
+print("Variance: " + str(np.var(rbf_lengths)))
+print("")
+# -
+# ## Looking for Specific Nouns
+# We can then look for prompts that have these nouns to create an adversarial dataset.
+
+
+noun_tags = ['NN', 'NNS', 'NNP', 'NNPS']
+for img in real_but_fake:
+    index = int(img[-9:-4])
+    description = df.iloc[index]['description']
+    tokens = nltk.word_tokenize(description)
+    tagged = nltk.pos_tag(tokens)
+    for word, tag in tagged:
+        if (tag in noun_tags):
+            print(word)
+    #counts = Counter(tag for word,tag in tagged)
+    #num_nouns = counts['NN'] + counts['NNS'] + counts['NNP'] + counts['NNPS']
+    #total += num_nouns
+    #rbf_nouns.append(num_nouns)
+    #rbf_lengths.append(len(tokens))
+
+# ## Printing the Confusion Matrix
+
+print(matrix)
+
+

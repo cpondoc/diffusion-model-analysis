@@ -53,15 +53,15 @@ class ImageDataset(Dataset):
         """
         self.transform = transform
         self.type_path = type_path
-        dalle_imgs = os.listdir('dataset/stable-diffusion')
+        dalle_imgs = os.listdir('dataset/dalle')
         
         # Define the IDs (i.e., 00000, 01234) of the images in the chosen data.
         if (type_path is "train"):
             total_count = int((len(dalle_imgs) - 1) * percent)
-            self.indices = [img[-9:-4] for img in dalle_imgs if (".png" in img)][:total_count]
+            self.indices = [img[-9:-4] for img in dalle_imgs if (".jpg" in img)][:total_count]
         else:
             total_count = int((len(dalle_imgs) - 1) * 0.1)
-            self.indices = [img[-9:-4] for img in dalle_imgs if (".png" in img)][-total_count:]
+            self.indices = [img[-9:-4] for img in dalle_imgs if (".jpg" in img)][-total_count:]
             
     def __len__(self):
         return len(self.indices) * 2
@@ -75,9 +75,9 @@ class ImageDataset(Dataset):
         img_id = self.indices[data_index]
         img_name = None
         if (data_half == 0):
-            img_name = 'dataset/stable-diffusion/stable-' + str(img_id) + '.png'
+            img_name = 'dataset/dalle/dalle-' + str(img_id) + '.jpg'
         else:
-            img_name = 'dataset/real/real-' + str(img_id) + '.jpg'
+            img_name = 'dataset/stable-diffusion/stable-' + str(img_id) + '.png'
         
         # Applying the image transformations and returning the data object
         torch_img = Image.open(img_name)
@@ -141,7 +141,7 @@ def generate_heatmap(transform, weights_path, batch_size, network):
                 result = overlay_mask(to_pil_image(current_image), to_pil_image(activation_map[0].cpu().squeeze(0), mode='F'), alpha=0.5)
                 plt.imshow(result); plt.axis('off'); 
                 plt.tight_layout();
-                name = "heatmaps/stable-diffusion/" + "heatmap_of_"+img_name.split('/')[-1]
+                name = "heatmaps/versus/" + "heatmap_of_"+img_name.split('/')[-1]
                 plt.savefig(name)
 
 # ## Main Function
@@ -185,71 +185,11 @@ def main(model_type):
     
     # Generate the necessary heatmaps
     for prop in proportions:
-        PATH = 'weights/TransferLearning/stable-diffusion/TransferLearning-0.6.pth'
+        PATH = 'weights/TransferLearning-0.6-dallevsd.pth'
         generate_heatmap(data_transforms[model_type], PATH, batch_size, network=model)
-        
-    return train_accs, test_accs
 
 # ## Run all code!
 # Runs all of the code for Transfer Learning.
 
 if __name__ == '__main__':
     main(model_type = "TransferLearning")
-
-# ## Dummy Code
-# For experimentation with the doggos.
-
-# +
-# Create model, attach to CUDA
-net = load_pretrained_model()
-if (torch.cuda.is_available()):
-    net.to('cuda')
-net.load_state_dict(torch.load('weights/TransferLearning-0.9.pth'))
-
-reference_imgs = [img for img in os.listdir("dataset/real") if ".jpg" in img]
-#reference_imgs = [img for img in os.listdir("reference") if ".png" in img]
-tf_transforms = transforms.Compose([
-        transforms.Grayscale(num_output_channels=3),
-        transforms.CenterCrop(250),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-with torch.no_grad():
-    for img in reference_imgs:
-    # Load in image
-        torch_img = Image.open("dataset/real/" + img)
-        #torch_img = Image.open("reference/" + img)
-        torch_img = tf_transforms(torch_img)
-        torch_img = torch_img.cuda()
-        #torch_img = torch_img.unsqueeze(1)
-        #print(torch_img)
-        outputs = net(torch_img[None, ...])
-        # the class with the highest energy is what we choose as prediction
-        #print(outputs.cpu().data)
-        _, predicted = torch.max(outputs.cpu().data, 1)
-        print(predicted)
-#total += labels.size(0)
-#correct += (predicted == labels).sum().item()
-# +
-net = load_pretrained_model()
-if (torch.cuda.is_available()):
-    net.to('cuda')
-net.load_state_dict(torch.load('weights/TransferLearning-0.9.pth'))
-
-loader = transforms.Compose([
-        transforms.Grayscale(num_output_channels=3),
-        transforms.CenterCrop(250),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-
-def image_loader(image_name):
-    """load image, returns cuda tensor"""
-    image = Image.open(image_name)
-    image = loader(image).float()
-    image = Variable(image, requires_grad=True)
-    image = image.unsqueeze(0)  #this is for VGG, may not be needed for ResNet
-    return image.cuda()  #assumes that you're using GPU
-
-image = image_loader("dataset/real/real-00001.jpg")
-
-outputs = net(image)
-print(outputs)
