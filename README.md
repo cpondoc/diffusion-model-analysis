@@ -17,6 +17,9 @@ We split up our code into several components.
 ### Models
 This folder contains code pertaining to our neural network architectures. `convbasic.py` contains code for our baseline CNN, while `transferlearning.py` contains code for our ResNet-18 architecture.
 
+### Analysis
+This folder contains code for all of the analysis done outside of model training. `Bias vs. Variance.ipynb` contains code for generating graphs to visualize the bias-variance tradeoff experiment we ran to determine the optimal data
+
 ### Results
 This folder contains all of our graphs and output logs pertaining to training and testing. `ConvBasic` contains all results for our baseline CNN, while `TransferLearning` contains all results for our ResNet-18 architecture. Each folder also has a subfolder pertaining to the specific task it was trained on: real vs. DALLE-2, Stable Diffusion, or pitting Stable Diffusion against DALLE-2. Finally, `BiasVariance` contains the graphs necessary for making a conclusion on the bias-variance tradeoff experiment, which we outlined in the **Methods** section of our paper.
 

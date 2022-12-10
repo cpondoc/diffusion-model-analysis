@@ -53,15 +53,15 @@ class ImageDataset(Dataset):
         """
         self.transform = transform
         self.type_path = type_path
-        dalle_imgs = os.listdir('dataset/dalle')
+        dalle_imgs = os.listdir('dataset/stable-diffusion')
         
         # Define the IDs (i.e., 00000, 01234) of the images in the chosen data.
         if (type_path is "train"):
             total_count = int((len(dalle_imgs) - 1) * percent)
-            self.indices = [img[-9:-4] for img in dalle_imgs if (".jpg" in img)][:total_count]
+            self.indices = [img[-9:-4] for img in dalle_imgs if (".png" in img)][:total_count]
         else:
             total_count = int((len(dalle_imgs) - 1) * 0.1)
-            self.indices = [img[-9:-4] for img in dalle_imgs if (".jpg" in img)][-total_count:]
+            self.indices = [img[-9:-4] for img in dalle_imgs if (".png" in img)][-total_count:]
             
     def __len__(self):
         return len(self.indices) * 2
@@ -75,7 +75,7 @@ class ImageDataset(Dataset):
         img_id = self.indices[data_index]
         img_name = None
         if (data_half == 0):
-            img_name = 'dataset/dalle/dalle-' + str(img_id) + '.jpg'
+            img_name = 'dataset/stable-diffusion/stable-' + str(img_id) + '.png'
         else:
             img_name = 'dataset/real/real-' + str(img_id) + '.jpg'
         
@@ -182,7 +182,7 @@ def main(model_type):
     # Generate the necessary heatmaps
     matrix, real_but_fake, all_images = None, None, None
     for prop in proportions:
-        PATH = 'weights/TransferLearning/dalle/TransferLearning-0.6.pth'
+        PATH = 'weights/TransferLearning/stable-diffusion/TransferLearning-0.6.pth'
         matrix, real_but_fake, all_images = generate_confusion_matrix(data_transforms[model_type], PATH, batch_size, network=model)
     
     return matrix, real_but_fake, all_images
@@ -272,7 +272,11 @@ def bootstrapping(total_observations, subsection_of_interest):
     print(count / iteration_count)
 
 #checking statistical significance of our findings
-print("Statistical le")
+print("Running simple bootstrapping to test against null hypothesis")
+print("Statistical significance of prompt lengths")
+bootstrapping(all_lengths, rbf_lengths)
+print("Statistical significance of noun counts")
+bootstrapping(all_nouns, rbf_nouns)
 # -
 
 # ## Looking for Specific Nouns
