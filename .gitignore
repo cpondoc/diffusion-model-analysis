@@ -2,7 +2,6 @@ __pycache__
 reference
 weights
 .DS_Store
-data
 dataset
 heatmaps
 .ipynb_checkpoints
