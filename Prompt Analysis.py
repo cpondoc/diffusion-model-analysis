@@ -257,9 +257,16 @@ print("Length of Message:")
 print("Mean: " + str(np.mean(rbf_lengths)))
 print("Variance: " + str(np.var(rbf_lengths)))
 print("")
-# +
-#super awesome bootstrapping techniques
 # -
+#super awesome bootstrapping techniques
+sample_mean = np.mean(all_lengths)
+mean_difference = abs(np.mean(all_lengths) - np.mean(rbf_lengths))
+false_positive_count = len(rbf_lengths)
+print(false_positive_count)
+iteration_count = 10000
+for _ in range(iteration_count):
+    sampled_lengths = np.random.choice(all_lengths, false_positive_count, replace=True)
+    if abs(np.mean(sampled_lengths) - )
 
 # ## Looking for Specific Nouns
 # We can then look for prompts that have these nouns to create an adversarial dataset.
