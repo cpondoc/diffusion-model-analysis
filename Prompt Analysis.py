@@ -257,18 +257,23 @@ print("Length of Message:")
 print("Mean: " + str(np.mean(rbf_lengths)))
 print("Variance: " + str(np.var(rbf_lengths)))
 print("")
-# -
+# +
 #super awesome bootstrapping techniques
-sample_mean = np.mean(all_lengths)
-mean_difference = abs(sample_mean - np.mean(rbf_lengths))
-false_positive_count = len(rbf_lengths)
-count = 0.0
-iteration_count = 10000
-for _ in range(iteration_count):
-    sampled_lengths = np.random.choice(all_lengths, false_positive_count, replace=True)
-    if abs(np.mean(sampled_lengths) - sample_mean) >= mean_difference:
-        count += 1
-print(count / iteration_count)
+def bootstrapping(total_observations, subsection_of_interest):
+    sample_mean = np.mean(total_observations)
+    mean_difference = abs(sample_mean - np.mean(subsection_of_interest))
+    subsection_length = len(subsection_of_interest)
+    count = 0.0
+    iteration_count = 10000
+    for _ in range(iteration_count):
+        sampled_lengths = np.random.choice(total_observations, subsection_length, replace=True)
+        if abs(np.mean(sampled_lengths) - sample_mean) >= mean_difference:
+            count += 1
+    print(count / iteration_count)
+
+#checking statistical significance of our findings
+print("Statistical le")
+# -
 
 # ## Looking for Specific Nouns
 # We can then look for prompts that have these nouns to create an adversarial dataset.

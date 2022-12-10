@@ -24,7 +24,3 @@ Each folder contains graphs of training and test accuracy against the proportion
 
 ### Reference
 This folder contains miscellaneous items: old scripts used when trying out old datasets (i.e. ImageNet for our milestone), scripts for scraping the DALLE-2 data using the OpenAI API, random AI-generated images, and graphs from old training runs.
-
-```python
-
-```
