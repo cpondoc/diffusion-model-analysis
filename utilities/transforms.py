@@ -11,7 +11,7 @@ data_transforms = {
     # Baseline CNN
     'ConvBasic': transforms.Compose(
     [transforms.Grayscale(num_output_channels=3),
-    transforms.CenterCrop(250),
+    transforms.CenterCrop(224),
      transforms.ToTensor(),
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
     
